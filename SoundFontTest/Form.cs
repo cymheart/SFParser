@@ -30,7 +30,8 @@ namespace SoundFontTest
 
         private void Form_SizeChanged(object sender, EventArgs e)
         {
-            scMgr.Refresh();
+            if (scMgr != null)
+                scMgr.Refresh();
         }
     }
 }
