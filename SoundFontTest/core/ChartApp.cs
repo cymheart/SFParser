@@ -14,12 +14,14 @@ namespace SoundFontTest
         ScMgr scMgr;
         ScLayer root;
         byte[] pcm_buffer;
+        PCMProcesser pcmProcesser;
+        short[] pcm;
         public ChartApp(ScMgr scMgr)
         {
             SF2 sf2 = new SF2("g:\\test.sf2");
             List<short> samples = sf2.SoundChunk.SMPLSubChunk.samples;
-            PCMProcesser pcmProcesser = new PCMProcesser();
-            short[] newSamples = pcmProcesser.PitchPcmNote(samples.ToArray(),24);
+            pcmProcesser = new PCMProcesser();
+            short[] newSamples = pcmProcesser.PitchPcmNote(samples.ToArray(),-24, true, 10);
 
             pcm_buffer = new byte[newSamples.Length * 2];
             int idx = 0;
@@ -38,7 +40,15 @@ namespace SoundFontTest
                 shortBufs.Add(val);
             }
 
-            float[] seqDatas = pcmProcesser.CreatePcmFreqNormAmpSpectrum(shortBufs.ToArray(), 44100);
+            List<float> floatBufs = new List<float>();
+            for (int i = 0; i < pcm_buffer.Length; i += 2)
+            {
+                val = (short)((pcm_buffer[i + 1] << 8) | pcm_buffer[i]);
+                floatBufs.Add(val);
+            }
+
+            pcm = shortBufs.ToArray();
+            float[] seqDatas = pcmProcesser.CreatePcmFreqNormAmpSpectrum(pcm, 44100);
 
             List<float> samplesFloat = new List<float>();
             for (int i = 0; i < shortBufs.Count; i++)
@@ -51,11 +61,23 @@ namespace SoundFontTest
             root = scMgr.GetRootLayer();
 
             ChartM chart = new ChartM(scMgr);
-            chart.N = pcm_buffer.Length/2;
-            chart.datas = seqDatas;
+            chart.CreateAxisXSeq = CreateAxisXSeq;
+            chart.Datas = samplesFloat.ToArray();
+           // chart.DataLineColor = Color.Blue;
+          //  chart.XAxisColor = Color.White;
+            chart.StartDataIdx = 0;
+            chart.EndDataIdx = 20000;
+            chart.xAxisSeqCount = 10;
             chart.Dock = ScDockStyle.Fill;
-            chart.BackgroundColor = Color.White;
+           // chart.BackgroundColor = Color.Black;
             root.Add(chart);
+        }
+
+        float CreateAxisXSeq()
+        {
+            return pcmProcesser.GetPcmBaseFreq(44100, pcm.Length);
+
+           // return 1;
         }
 
 

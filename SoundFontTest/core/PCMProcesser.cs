@@ -53,12 +53,12 @@ namespace SoundFontTest
             return newPcmTime;
         }
 
-        public short[] PitchPcmNote(short[] pcm, int semitCount)
+        public short[] PitchPcmNote(short[] pcm, int semitCount, bool isSmooth = true, int smoothRadius = 10)
         {
             if (semitCount > 0)
                 return RightOffsetPcmNote(pcm, (uint)semitCount);
             else
-                return LeftOffsetPcmNote(pcm, (uint)-semitCount);
+                return LeftOffsetPcmNote(pcm, (uint)-semitCount, isSmooth, smoothRadius);
         }
 
 
@@ -236,7 +236,7 @@ namespace SoundFontTest
         {       
             float n;
             float max = 0;
-            float baseFreq = pcmSampleFreq / pcmFreqSpectrum.Length / 2;
+            float baseFreq = pcmSampleFreq / (pcmFreqSpectrum.Length / 2);
 
             List<float> result = new List<float>();
 

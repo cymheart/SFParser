@@ -13,13 +13,44 @@ namespace SoundFontTest
 {
     public class ChartM : ScLayer
     {
-        public int N;
-        public float[] datas;
-        List<float> scaleDataList = new List<float>();
 
+        public delegate float CreateAxisXSeqAction();
+        public CreateAxisXSeqAction CreateAxisXSeq;
+
+        public int StartDataIdx = 0;
+        public int EndDataIdx = 0;
+        public int xAxisSeqCount = 10;
+
+        public Color DataLineColor = Color.Red;
+        public Color XAxisColor = Color.Black;
+
+        float maxAbsDataValue = 0;
+        float scale;
+        TextFormat textFormat;
+
+        float[] datas;
+        public float[] Datas
+        {
+            get { return datas; }
+            set
+            {
+                datas = value;
+
+                for (int i = 0; i < datas.Length; i++)
+                {
+                    if (Math.Abs(datas[i]) > maxAbsDataValue)
+                        maxAbsDataValue = Math.Abs(datas[i]);
+                }
+
+            }
+        }
+        
         public ChartM(ScMgr scmgr = null)
             : base(scmgr)
         {
+            textFormat = new TextFormat(D2DGraphics.dwriteFactory, "微软雅黑", 10)
+            { TextAlignment = TextAlignment.Center, ParagraphAlignment = ParagraphAlignment.Center, WordWrapping = WordWrapping.Wrap };
+
             SizeChanged += ScPanel_SizeChanged;
             D2DPaint += ScPanel_D2DPaint;
         }
@@ -27,125 +58,117 @@ namespace SoundFontTest
 
         private void ScPanel_SizeChanged(object sender, SizeF oldSize)
         {
-            ScaleDatas();
+            scale = (Height / 2) / maxAbsDataValue;
         }
 
-        void ScaleDatas()
+        int GetDrawDataCount()
         {
-            scaleDataList.Clear();
-            float max = 0;
+            int startIdx = StartDataIdx;
+            int endIdx = EndDataIdx;
+            if (endIdx <= 0)
+                endIdx = datas.Length - 1;
 
-            for(int i=0; i<datas.Length; i++)
-            {
-                if (Math.Abs(datas[i]) > max)
-                    max = Math.Abs(datas[i]);
-            }
-
-            float scale = (Height / 2) / max;
-
-            for(int i = 0; i < datas.Length; i++)
-            {
-                scaleDataList.Add(datas[i] * scale);
-            }
-
+            return endIdx - startIdx + 1;
         }
 
-        private void ScPanel_D2DPaint2(D2DGraphics g)
+
+        int GetCombineIdx(int startIdx, int endIdx)
         {
-            g.RenderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
+            float startVal = datas[startIdx] * scale;
+            int lastIdx = startIdx + 1;
+            float d;
 
-            SolidColorBrush brush = new SolidColorBrush(g.RenderTarget, new RawColor4(0,0,0,1));
-            float baselineY = Height / 2;
-            float step = Width / (scaleDataList.Count - 1);
+            int dataCount = GetDrawDataCount();
 
-            RawVector2 pt1 = new RawVector2(0, -scaleDataList[0] + baselineY);
-            RawVector2 pt2 = new RawVector2();
+            for (int i = startIdx + 1; i <= endIdx; i++)
+            {        
+                d = Math.Abs(datas[i] * scale - startVal);
 
-            for (int i=0; i< scaleDataList.Count; i++)
-            {
-                pt2.X = i * step;
-                pt2.Y = -scaleDataList[i] + baselineY;
-                g.RenderTarget.DrawLine(pt1, pt2, brush, 0.3f);
 
-                pt1 = pt2;
+                if ((dataCount <= 20000 && d > 0.2f) ||
+                    (dataCount > 20000 && dataCount <= 100000 && d > 0.2f) ||
+                    (dataCount > 100000 && d > 0.2f))
+                {
+                    return lastIdx;
+                }
+
+                lastIdx = i;
             }
 
+            return endIdx;
         }
 
-      
         private void ScPanel_D2DPaint(D2DGraphics g)
         {
+            DrawDatas(g);
+            DrawAxisX(g);
+        }
+
+        void DrawDatas(D2DGraphics g)
+        {
             g.RenderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
-
-            SolidColorBrush brush = new SolidColorBrush(g.RenderTarget, new RawColor4(1, 0, 0, 1));
-
-            float baseSeq = (float)44100 / N;
-
+            SolidColorBrush brush = new SolidColorBrush(g.RenderTarget, GDIDataD2DUtils.TransToRawColor4(DataLineColor));
 
             float baselineY = Height / 2;
+            int startIdx = StartDataIdx;
+            int endIdx = EndDataIdx;
+            if (endIdx <= 0)
+                endIdx = datas.Length - 1;
 
+            float step = Width / (endIdx - startIdx);
 
-
-            float step = Width / 20000;
-
-
-            RawVector2 pt1 = new RawVector2(0, -scaleDataList[0] + baselineY);
+            int prevIdx = startIdx;
+            int lastIdx = startIdx;
+            RawVector2 pt1 = new RawVector2(0, -datas[startIdx] * scale + baselineY);
             RawVector2 pt2 = new RawVector2();
 
-            for (int i = 1; i < scaleDataList.Count; i++)
+
+            while (lastIdx < endIdx)
             {
-                pt2.X = baseSeq * i * step;
-                pt2.Y = -scaleDataList[i] + baselineY;
+                lastIdx = GetCombineIdx(prevIdx, endIdx);
+                pt2.X = (lastIdx - startIdx) * step;
+                pt2.Y = -datas[lastIdx] * scale + baselineY;
                 g.RenderTarget.DrawLine(pt1, pt2, brush, 0.5f);
                 pt1 = pt2;
+                prevIdx = lastIdx;
             }
+        }
 
-            //
+        void DrawAxisX(D2DGraphics g)
+        {
+            g.RenderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
+
+            int startIdx = StartDataIdx;
+            int endIdx = EndDataIdx;
+            if (endIdx <= 0)
+                endIdx = datas.Length - 1;
+
             StrokeStyleProperties ssp = new StrokeStyleProperties();
             ssp.DashStyle = DashStyle.DashDot;
             StrokeStyle strokeStyle = new StrokeStyle(D2DGraphics.d2dFactory, ssp);
-            SolidColorBrush brush2 = new SolidColorBrush(g.RenderTarget, new RawColor4(0, 0, 0, 1));
-            g.RenderTarget.DrawLine(new RawVector2(0, Height/2), new RawVector2(Width, Height/2), brush2, 0.5f, strokeStyle);
+            SolidColorBrush brush2 = new SolidColorBrush(g.RenderTarget, GDIDataD2DUtils.TransToRawColor4(XAxisColor));
+            g.RenderTarget.DrawLine(new RawVector2(0, Height / 2), new RawVector2(Width, Height / 2), brush2, 0.5f, strokeStyle);
 
             //
-            float widthStep = Width / 10.0f;
-            float seqStep = 20000 / 10.0f;
+            float widthStep = Width / xAxisSeqCount;
+
+            float numSeq = CreateAxisXSeq(); 
+            float startNum = startIdx * numSeq;
+            float numWidth = (endIdx - startIdx) * numSeq;
+            float numStep = numWidth / xAxisSeqCount;
+            
             RawRectangleF rect;
 
-            for (int i=0; i<10; i++)
+            for (int i = 0; i < xAxisSeqCount; i++)
             {
-                SolidColorBrush brushx = new SolidColorBrush(g.RenderTarget, new RawColor4(0, 0, 0, 1));
-                TextFormat textFormat = new TextFormat(D2DGraphics.dwriteFactory, "微软雅黑", 10)
-                { TextAlignment = TextAlignment.Center, ParagraphAlignment = ParagraphAlignment.Center };
-
-                textFormat.WordWrapping = WordWrapping.Wrap;
-
                 float x = (widthStep * i - 100 + widthStep * i + 100) / 2f;
-
-
                 g.RenderTarget.DrawLine(new RawVector2(x, Height / 2), new RawVector2(x, Height / 2 + 3), brush2, 1f);
 
-                rect = new RawRectangleF(widthStep * i - 100, Height/2, widthStep * i + 100, Height/2 + 15);
-                string str = (i * seqStep).ToString();
+                //
+                rect = new RawRectangleF(widthStep * i - 100, Height / 2, widthStep * i + 100, Height / 2 + 15);
+                string str = (startNum + i * numStep).ToString("#.##");
                 g.RenderTarget.DrawText(str, textFormat, rect, brush2, DrawTextOptions.Clip);
             }
-
-
-            //RawRectangleF rect = new RawRectangleF(0, 1, Width - 1, Height -1);
-            //RawColor4 rawColor = GDIDataD2DUtils.TransToRawColor4(Color.FromArgb(255, 255, 0, 0));
-            //SolidColorBrush brush2 = new SolidColorBrush(g.RenderTarget, rawColor);
-            //g.RenderTarget.DrawRectangle(rect, brush2, 5);
-
-            //rect = new RawRectangleF(0, 0, Width - 1, 10 - 1);
-            //rawColor = GDIDataD2DUtils.TransToRawColor4(Color.FromArgb(255, 122, 151, 207));
-            //brush = new SolidColorBrush(g.RenderTarget, rawColor);
-            //g.RenderTarget.FillRectangle(rect, brush);
-
-
-            //rect = new RawRectangleF(1, 1, Width - 1, Height - 1);
-            //rawColor = GDIDataD2DUtils.TransToRawColor4(Color.FromArgb(255, 214, 215, 220));
-            //brush = new SolidColorBrush(g.RenderTarget, rawColor);
-            //g.RenderTarget.DrawRectangle(rect, brush);
-        }
+        }       
     }
 }
