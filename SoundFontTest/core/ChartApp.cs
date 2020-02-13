@@ -66,7 +66,7 @@ namespace SoundFontTest
            // chart.DataLineColor = Color.Blue;
           //  chart.XAxisColor = Color.White;
             chart.StartDataIdx = 0;
-            chart.EndDataIdx = 20000;
+            chart.EndDataIdx = 0;
             chart.xAxisSeqCount = 10;
             chart.Dock = ScDockStyle.Fill;
            // chart.BackgroundColor = Color.Black;

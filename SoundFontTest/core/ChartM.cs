@@ -71,23 +71,50 @@ namespace SoundFontTest
             return endIdx - startIdx + 1;
         }
 
-
-        int GetCombineIdx(int startIdx, int endIdx)
+        int GetSameAxisxIdx(int startIdx, int endIdx, RawVector2 startPoint, float step, out RawVector2 yrange)
         {
-            float startVal = datas[startIdx] * scale;
+            float x, y;
+            float m = datas[startIdx] * scale;
+            float minY = m, maxY = m;
+
+         
+            for (int i = startIdx + 1; i <= endIdx; i++)
+            {
+                x = (i - StartDataIdx) * step;
+                y = datas[i] * scale;
+
+                if (x - startPoint.X < 0.1f)
+                {
+                    if (y > maxY) 
+                        maxY = y;
+                    else if (y < minY)
+                        minY = y;
+                }
+                else
+                {
+                    yrange = new RawVector2(maxY, minY);
+                    return i - 1;
+                }
+            }
+
+            yrange = new RawVector2(maxY, minY);
+            return endIdx;
+        }
+
+
+        int GetCombineIdx(int startIdx, int endIdx, RawVector2 startPoint)
+        {
+            float startVal = startPoint.Y;
             int lastIdx = startIdx + 1;
             float d;
 
             int dataCount = GetDrawDataCount();
 
             for (int i = startIdx + 1; i <= endIdx; i++)
-            {        
+            {            
                 d = Math.Abs(datas[i] * scale - startVal);
 
-
-                if ((dataCount <= 20000 && d > 0.2f) ||
-                    (dataCount > 20000 && dataCount <= 100000 && d > 0.2f) ||
-                    (dataCount > 100000 && d > 0.2f))
+                if (d > 0.05f)
                 {
                     return lastIdx;
                 }
@@ -119,13 +146,29 @@ namespace SoundFontTest
 
             int prevIdx = startIdx;
             int lastIdx = startIdx;
+            int sameIdx;
             RawVector2 pt1 = new RawVector2(0, -datas[startIdx] * scale + baselineY);
             RawVector2 pt2 = new RawVector2();
-
+            RawVector2 yrange;
 
             while (lastIdx < endIdx)
             {
-                lastIdx = GetCombineIdx(prevIdx, endIdx);
+                sameIdx = GetSameAxisxIdx(prevIdx, endIdx, pt1, step, out yrange);
+
+                if (sameIdx != prevIdx)
+                {
+                    g.RenderTarget.DrawLine(
+                        new RawVector2(pt1.X, baselineY - yrange.X),
+                        new RawVector2(pt1.X, baselineY - yrange.Y), brush, 0.5f);
+
+                    pt2.X = pt1.X;
+                    pt2.Y = -datas[sameIdx] * scale + baselineY;
+                    pt1 = pt2;
+                    prevIdx = sameIdx;
+                }
+
+                //
+                lastIdx = GetCombineIdx(prevIdx, endIdx, pt1);
                 pt2.X = (lastIdx - startIdx) * step;
                 pt2.Y = -datas[lastIdx] * scale + baselineY;
                 g.RenderTarget.DrawLine(pt1, pt2, brush, 0.5f);
