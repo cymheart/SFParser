@@ -11,22 +11,59 @@ using SharpDX.DirectWrite;
 
 namespace SoundFontTest
 {
-    public class ChartM : ScLayer
+    public struct DrawDataRange
+    {
+        public  DrawDataRange(int startIdx, int endIdx)
+        {
+            this.startIdx = startIdx;
+            this.endIdx = endIdx;
+        }
+
+        public int startIdx;
+        public int endIdx;
+    }
+
+    public class ScChart : ScLayer
     {
 
-        public delegate float CreateAxisXSeqAction();
-        public CreateAxisXSeqAction CreateAxisXSeq;
+        public delegate float GetAxisXSeqAction();
+        public GetAxisXSeqAction GetAxisXSeq;
 
-        public int StartDataIdx = 0;
-        public int EndDataIdx = 0;
+
         public int xAxisSeqCount = 10;
-
         public Color DataLineColor = Color.Red;
         public Color XAxisColor = Color.Black;
 
         float maxAbsDataValue = 0;
         float scale;
         TextFormat textFormat;
+
+        DrawDataRange dataRange = new DrawDataRange(0, 0);
+        public DrawDataRange DataRange
+        {
+            get { return dataRange; }
+            set
+            {
+                dataRange = value;
+
+                if (dataRange.startIdx < 0)
+                    dataRange.startIdx = 0;
+
+                if (datas != null)
+                {
+                    if (dataRange.endIdx <= 0)
+                        dataRange.endIdx = datas.Length - 1;
+
+                    if (dataRange.endIdx > datas.Length - 1)
+                        dataRange.endIdx = datas.Length - 1;
+                }
+    
+                if (dataRange.startIdx > dataRange.endIdx)
+                    dataRange.startIdx = dataRange.endIdx;
+            }
+        }
+
+     
 
         float[] datas;
         public float[] Datas
@@ -42,10 +79,11 @@ namespace SoundFontTest
                         maxAbsDataValue = Math.Abs(datas[i]);
                 }
 
+                DataRange = dataRange;
             }
         }
         
-        public ChartM(ScMgr scmgr = null)
+        public ScChart(ScMgr scmgr = null)
             : base(scmgr)
         {
             textFormat = new TextFormat(D2DGraphics.dwriteFactory, "微软雅黑", 10)
@@ -53,22 +91,42 @@ namespace SoundFontTest
 
             SizeChanged += ScPanel_SizeChanged;
             D2DPaint += ScPanel_D2DPaint;
+            MouseWheel += ScChart_MouseWheel;
         }
 
+        private void ScChart_MouseWheel(object sender, ScMouseEventArgs e)
+        {
+
+            float step = Width / (dataRange.endIdx - dataRange.startIdx);
+            PointF pt = e.Location;
+            int idx = dataRange.startIdx + (int)(pt.X / step);
+            int start, end;
+
+            float n = 2f;
+
+            if (e.Delta > 0)
+            {
+                start = (int)((dataRange.startIdx + idx) / n);
+                end = (int)((idx + dataRange.endIdx) / n);
+            }
+            else
+            {
+                start = (int)(dataRange.startIdx - (idx - dataRange.startIdx) * n);
+                end = (int)(dataRange.endIdx + ( dataRange.endIdx - idx) * n);
+            }
+
+            if (end - start < 0.1f)
+                return;
+
+            DataRange = new DrawDataRange(start, end);
+
+            Refresh();
+
+        }
 
         private void ScPanel_SizeChanged(object sender, SizeF oldSize)
         {
             scale = (Height / 2) / maxAbsDataValue;
-        }
-
-        int GetDrawDataCount()
-        {
-            int startIdx = StartDataIdx;
-            int endIdx = EndDataIdx;
-            if (endIdx <= 0)
-                endIdx = datas.Length - 1;
-
-            return endIdx - startIdx + 1;
         }
 
         int GetSameAxisxIdx(int startIdx, int endIdx, RawVector2 startPoint, float step, out RawVector2 yrange)
@@ -80,7 +138,7 @@ namespace SoundFontTest
          
             for (int i = startIdx + 1; i <= endIdx; i++)
             {
-                x = (i - StartDataIdx) * step;
+                x = (i - dataRange.startIdx) * step;
                 y = datas[i] * scale;
 
                 if (x - startPoint.X < 0.1f)
@@ -107,8 +165,6 @@ namespace SoundFontTest
             float startVal = startPoint.Y;
             int lastIdx = startIdx + 1;
             float d;
-
-            int dataCount = GetDrawDataCount();
 
             for (int i = startIdx + 1; i <= endIdx; i++)
             {            
@@ -137,11 +193,8 @@ namespace SoundFontTest
             SolidColorBrush brush = new SolidColorBrush(g.RenderTarget, GDIDataD2DUtils.TransToRawColor4(DataLineColor));
 
             float baselineY = Height / 2;
-            int startIdx = StartDataIdx;
-            int endIdx = EndDataIdx;
-            if (endIdx <= 0)
-                endIdx = datas.Length - 1;
-
+            int startIdx = dataRange.startIdx;
+            int endIdx = dataRange.endIdx;
             float step = Width / (endIdx - startIdx);
 
             int prevIdx = startIdx;
@@ -181,11 +234,8 @@ namespace SoundFontTest
         {
             g.RenderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
 
-            int startIdx = StartDataIdx;
-            int endIdx = EndDataIdx;
-            if (endIdx <= 0)
-                endIdx = datas.Length - 1;
-
+            int startIdx = dataRange.startIdx;
+            int endIdx = dataRange.endIdx;
             StrokeStyleProperties ssp = new StrokeStyleProperties();
             ssp.DashStyle = DashStyle.DashDot;
             StrokeStyle strokeStyle = new StrokeStyle(D2DGraphics.d2dFactory, ssp);
@@ -195,7 +245,7 @@ namespace SoundFontTest
             //
             float widthStep = Width / xAxisSeqCount;
 
-            float numSeq = CreateAxisXSeq(); 
+            float numSeq = GetAxisXSeq(); 
             float startNum = startIdx * numSeq;
             float numWidth = (endIdx - startIdx) * numSeq;
             float numStep = numWidth / xAxisSeqCount;

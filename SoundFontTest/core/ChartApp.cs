@@ -60,24 +60,23 @@ namespace SoundFontTest
             this.scMgr = scMgr;
             root = scMgr.GetRootLayer();
 
-            ChartM chart = new ChartM(scMgr);
-            chart.CreateAxisXSeq = CreateAxisXSeq;
+            ScChart chart = new ScChart(scMgr);
+            chart.GetAxisXSeq = GetAxisXSeq;
             chart.Datas = samplesFloat.ToArray();
-           // chart.DataLineColor = Color.Blue;
-          //  chart.XAxisColor = Color.White;
-            chart.StartDataIdx = 0;
-            chart.EndDataIdx = 0;
+            // chart.DataLineColor = Color.Blue;
+            //  chart.XAxisColor = Color.White;
+           // chart.DataRange = new DrawDataRange(0, 5000);
             chart.xAxisSeqCount = 10;
             chart.Dock = ScDockStyle.Fill;
            // chart.BackgroundColor = Color.Black;
             root.Add(chart);
         }
 
-        float CreateAxisXSeq()
+        float GetAxisXSeq()
         {
-            return pcmProcesser.GetPcmBaseFreq(44100, pcm.Length);
+           // return pcmProcesser.GetPcmBaseFreq(44100, pcm.Length);
 
-           // return 1;
+            return 1;
         }
 
 

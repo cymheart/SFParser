@@ -90,7 +90,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="core\ChartApp.cs" />
-    <Compile Include="core\ChartM.cs" />
+    <Compile Include="core\ScChart.cs" />
     <Compile Include="Form.cs">
       <SubType>Form</SubType>
     </Compile>
